@@ -79,5 +79,6 @@
 * **Запуск для сезона 2017/18:**
 
     ```bash
-    python khl_standings.py khl_2017_18.csv --task standings
+    python khl_standings.py khl_2017_18.csv --task standings --pretty
+    
     ```
