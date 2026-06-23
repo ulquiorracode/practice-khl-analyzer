@@ -1,0 +1,30 @@
+[build-system]
+# Определение билд-системы для сборки проекта
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# Метаданные вашего учебного проекта
+name = "khl_season_analyzer"
+version = "1.0.0"
+description = "Объектно-ориентированный анализатор турнирных таблиц КХЛ"
+readme = "README.md"
+authors = [{ name = "Ваше Имя", email = "your.email@university.edu" }]
+# Минимальная версия Python
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+# Зависимости проекта (строго по вашему ТЗ + библиотека tabulate)
+dependencies = [
+    "numpy>=1.20.0",
+    "pandas>=1.3.0",
+    "matplotlib>=3.4.0",
+    "tabulate>=0.8.9",
+]
+
+[tool.setuptools.packages.find]
+# Автоматический поиск пакетов (папок с __init__.py) для сборки
+where = ["."]
