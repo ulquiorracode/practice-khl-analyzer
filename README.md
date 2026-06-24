@@ -1,4 +1,5 @@
 # practice-khl-analyzer
+
 Аналитическая система КХЛ
 
 ## Запуск программы
@@ -6,13 +7,15 @@
 Чтобы запусить программу необходимо передать в CLI обязательные параметры:
 
 ```bash
-python khl_standings.py <path_to_csv>
+python main.py <path_to_csv>
 ```
 
 Где:
+
 - <path_to_csv> - путь до файла с данными
 
 Дополнительные параметры:
+
 - --task - задание, которое необходимо выполнить
 - --pretty - вывод красивой таблицы
 - --team - команда, для которой необходимо выполнить задание
@@ -21,16 +24,16 @@ python khl_standings.py <path_to_csv>
 
 Метод строит ломаную линию набора очков нарастающим итогом на протяжении всего регулярного чемпионата.
 
-* **Пример для сезона 2017/18 (клуб «СКА»):**
+- **Пример для сезона 2017/18 (клуб «СКА»):**
 
     ```bash
-    python khl_standings.py data/khl_2017_18.csv --task points_plot --team "СКА"
+    python main.py data/khl_2017_18.csv --task points_plot --team "СКА"
     ```
 
-* **Пример для сезона 2015/16 (клуб «Салават Юлаев»):**
+- **Пример для сезона 2015/16 (клуб «Салават Юлаев»):**
 
     ```bash
-    python khl_standings.py data/khl_2015_16.csv --task points_plot --team "Салават Юлаев"
+    python main.py data/khl_2015_16.csv --task points_plot --team "Салават Юлаев"
     ```
 
 ---
@@ -39,16 +42,16 @@ python khl_standings.py <path_to_csv>
 
 Метод строит частотное распределение (гистограмму), показывая, сколько команд попало в определенные интервалы по количеству набранных очков (например, сколько клубов-аутсайдеров, середняков и лидеров).
 
-* **Пример для сезона 2017/18:**
+- **Пример для сезона 2017/18:**
 
     ```bash
-    python khl_standings.py data/khl_2017_18.csv --task points_hist
+    python main.py data/khl_2017_18.csv --task points_hist
     ```
 
-* **Пример для сезона 2013/14:**
+- **Пример для сезона 2013/14:**
 
     ```bash
-    python khl_standings.py data/khl_2013_14.csv --task points_hist
+    python main.py data/khl_2013_14.csv --task points_hist
     ```
 
 ---
@@ -57,16 +60,16 @@ python khl_standings.py <path_to_csv>
 
 Метод визуализирует динамику изменения баланса шайб (забитые минус пропущенные) нарастающим итогом. Позволяет увидеть, в какой момент сезона команда ушла в плюс или минус.
 
-* **Пример для сезона 2017/18 (клуб «Ак Барс»):**
+- **Пример для сезона 2017/18 (клуб «Ак Барс»):**
 
     ```bash
-    python khl_standings.py data/khl_2017_18.csv --task diff_plot --team "Ак Барс"
+    python main.py data/khl_2017_18.csv --task diff_plot --team "Ак Барс"
     ```
 
-* **Пример для сезона 2016/17 (клуб «Металлург Мг»):**
+- **Пример для сезона 2016/17 (клуб «Металлург Мг»):**
 
     ```bash
-    python khl_standings.py data/khl_2016_17.csv --task diff_plot --team "Металлург Мг"
+    python main.py data/khl_2016_17.csv --task diff_plot --team "Металлург Мг"
     ```
 
 ---
@@ -75,16 +78,16 @@ python khl_standings.py <path_to_csv>
 
 Метод показывает частоту распределения команд по общему количеству заброшенных ими шайб в регулярном чемпионате.
 
-* **Пример для сезона 2017/18:**
+- **Пример для сезона 2017/18:**
 
     ```bash
-    python khl_standings.py data/khl_2017_18.csv --task goals_hist
+    python main.py data/khl_2017_18.csv --task goals_hist
     ```
 
-* **Пример для сезона 2014/15:**
+- **Пример для сезона 2014/15:**
 
     ```bash
-    python khl_standings.py data/khl_2014_15.csv --task goals_hist
+    python main.py data/khl_2014_15.csv --task goals_hist
     ```
 
 ---
@@ -93,9 +96,9 @@ python khl_standings.py <path_to_csv>
 
 Для демонстрации работы общей таблицы чемпионата и конференций со встроенной рамкой `tabulate`:
 
-* **Запуск для сезона 2017/18:**
+- **Запуск для сезона 2017/18:**
 
     ```bash
-    python khl_standings.py data/khl_2017_18.csv --task standings --pretty
+    python main.py data/khl_2017_18.csv --task standings --pretty
     
     ```
