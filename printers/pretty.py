@@ -1,6 +1,6 @@
-"""Улучшенный вывод таблиц"""
+"""Принтер форматированной консольной сетки."""
 
-# Этот импорт для красивой таблички. Делается автоматически
+import sys
 from tabulate import tabulate
 from .base import BasePrinter
 from models import StandingsTable
@@ -8,7 +8,8 @@ from models import StandingsTable
 # Наследуемся от базового минимума
 class PrettyConsolePrinter(BasePrinter):
     """Красивый консольный вывод в виде псевдографической сетки (таблицы)."""
-    def print_table(self, table: StandingsTable, title: str) -> None:
-        print(f"\n==================== {title.upper()} ====================")
+    def print_table(self, table: StandingsTable, title: str, stream=sys.stdout) -> None:
+        stream.write(f"\n==================== {title.upper()} ====================\n")
         # Библиотека tabulate превращает DataFrame в готовую сетку с заголовками
-        print(tabulate(table.to_dataframe(), headers="keys", tablefmt="fancy_grid", showindex=False))
+        grid = tabulate(table.to_dataframe(), headers="keys", tablefmt="fancy_grid", showindex=False)
+        stream.write(grid + "\n")

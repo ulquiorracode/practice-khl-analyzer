@@ -1,23 +1,21 @@
+# -*- coding: utf-8 -*-
 """Точка входа приложения. Парсинг CLI и запуск задач."""
 
 import argparse
-from sys import exit
-import pandas as pd
+import sys
 from typing import Dict, Callable
+import pandas as pd
 from analyzer import KHLSeasonAnalyzer
-from printers import BasePrinter, PlainPrinter, PrettyConsolePrinter
+from printers import BasePrinter, PlainPrinter, PrettyConsolePrinter, HtmlPrinter
 
 
-# Функция, которую вызываем при запуске скрипта
 def main() -> None:
     """Точка входа."""
-    # Инициализируем парсер аргументов командной строки
+    # Реконфигурация кодировки вывода для кириллицы
+    sys.stdout.reconfigure(encoding='utf-8')
+
     parser = argparse.ArgumentParser(description="Аналитическая система КХЛ")
-    
-    # Обязательный первый аргумент — путь к CSV-файлу с матчами
     parser.add_argument("csv_file", type=str, help="Путь к файлу регулярного сезона")
-    
-    # Режим работы программы (по умолчанию — вывод таблиц)
     parser.add_argument(
         "--task",
         type=str,
@@ -25,41 +23,61 @@ def main() -> None:
         default="standings",
         help="Режим выполнения"
     )
-    
-    # Имя команды (нужно только для индивидуальных графиков)
     parser.add_argument("--team", type=str, default="", help="Целевая команда")
-    # Флаг для красивого вывода таблиц в рамке
-    parser.add_argument("--pretty", action="store_true", help="Красивый вывод таблиц")
+    parser.add_argument(
+        "--format",
+        type=str,
+        choices=["text", "pretty", "html"],
+        default="text",
+        help="Формат вывода таблиц"
+    )
+    # Добавляем новый аргумент для вывода напрямую в файл
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="",
+        help="Путь к файлу для сохранения вывода (позволяет избежать проблем с кодировкой консоли)"
+    )
     args = parser.parse_args()
 
-    # Создаем экземпляр нашего аналитического класса
     analyzer = KHLSeasonAnalyzer(args.csv_file)
 
-    # Выбираем способ печати таблиц в консоль на основании флага --pretty
-    # Это паттерн "Стратегия": подменяем логику вывода без изменения основного кода
-    printer_map: Dict[bool, BasePrinter] = {
-        True: PrettyConsolePrinter(),
-        False: PlainPrinter()
+    # Диспетчеризация выбора принтера
+    printer_map: Dict[str, BasePrinter] = {
+        "text": PlainPrinter(),
+        "pretty": PrettyConsolePrinter(),
+        "html": HtmlPrinter()
     }
-    printer: BasePrinter = printer_map[args.pretty]
+    printer: BasePrinter = printer_map[args.format]
 
-    # Валидация аргументов: если пользователь выбрал график по команде,
-    # но саму команду не указал, прекращаем работу программы с сообщением об ошибке
+    # Валидация аргументов
     is_team_required: bool = pd.Series([args.task]).isin(["points_plot", "diff_plot"]).iloc[0]
     is_team_empty: bool = pd.Series([args.team]).isin(["", None]).iloc[0]
-    (is_team_required and is_team_empty) and exit("Ошибка: Параметр --team обязателен для этого режима.")
+    (is_team_required and is_team_empty) and sys.exit("Ошибка: Параметр --team обязателен для этого режима.")
+
+    # Выбираем поток вывода без использования условного оператора "if"
+    # Использование лямбда-функций позволяет отложить открытие файла до момента вызова
+    stream_resolver: Dict[bool, Callable[[], any]] = {
+        True: lambda: open(args.output, "w", encoding="utf-8"),
+        False: lambda: sys.stdout
+    }
+    # Вычисляем поток (если args.output заполнен, откроется файл, иначе вернется sys.stdout)
+    output_stream = stream_resolver[bool(args.output)]()
 
     def run_standings() -> None:
-        """Локальная функция для вывода общей таблицы и таблиц конференций."""
-        # Печатаем общую таблицу регулярки
-        printer.print_table(analyzer.get_champion_table(), "Итоговая таблица чемпионата")
-        # Получаем и печатаем таблицы по конференциям
+        # Передаем поток вывода в принтеры
+        printer.print_table(analyzer.get_champion_table(), "Итоговая таблица чемпионата", output_stream)
         conf_tables = analyzer.get_conference_tables()
         pd.Series(conf_tables).apply(
-            lambda table: printer.print_table(table, "Таблица конференции")
+            lambda table: printer.print_table(table, "Таблица конференции", output_stream)
         )
+        
+        # Закрываем поток, если это файл (sys.stdout закрывать нельзя)
+        # Проверяем, является ли поток файлом, без использования if
+        is_file: bool = output_stream != sys.stdout
+        is_file and output_stream.close()
 
-    # Словарь сопоставления строкового названия задачи и реального Python-метода (Диспетчеризация)
+    # Диспетчеризация задач
     dispatch_map: Dict[str, Callable[[], None]] = {
         "standings": run_standings,
         "points_plot": lambda: analyzer.plot_team_points(args.team),
@@ -68,10 +86,8 @@ def main() -> None:
         "goals_hist": analyzer.plot_goals_histogram
     }
 
-    # Достаем нужную функцию из словаря по ключу и вызываем ее
     dispatch_map[args.task]()
 
 
-# Точка в ходу в программу, вызываем main
 if __name__ == "__main__":
     main()
