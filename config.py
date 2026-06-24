@@ -2,8 +2,12 @@
 
 from typing import Dict, List
 
+# Это алиасы (наименования) типов конференций и дивизионов для удобства. 
+Conference = Dict[str, List[str]]
+Division = Dict[str, List[List[str]]]
+
 # Исторические составы конференций
-CONFERENCES: Dict[str, Dict[str, List[str]]] = {
+CONFERENCES: Dict[str, Conference] = {
     "khl_2013_14.csv": {
         "Запад": [
             "Динамо М", "ЦСКА", "СКА", "Лев Пр", "Донбасс", "Динамо Р",
@@ -63,7 +67,7 @@ CONFERENCES: Dict[str, Dict[str, List[str]]] = {
 }
 
 # Исторические составы дивизионов
-DIVISIONS: Dict[str, Dict[str, List[List[str]]]] = {
+DIVISIONS: Dict[str, Division] = {
     "khl_2017_18.csv": {
         "Запад": [
             ["СКА", "Йокерит", "Спартак", "Динамо Мн", "Слован", "Динамо Р"],
