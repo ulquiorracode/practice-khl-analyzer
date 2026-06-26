@@ -9,7 +9,12 @@ name = "khl_season_analyzer"
 version = "1.0.0"
 description = "Объектно-ориентированный анализатор турнирных таблиц КХЛ"
 readme = "README.md"
-authors = [{ name = "Ваше Имя", email = "your.email@university.edu" }]
+authors = [
+    { name = "Бобровских Егор", email = "ebobrovskikh@sfedu.ru" },
+    # { name = "", email = "" }
+    # { name = "", email = "" }
+    # { name = "", email = "" }
+]
 # Минимальная версия Python
 requires-python = ">=3.9"
 classifiers = [

@@ -261,7 +261,10 @@ class KHLSeasonAnalyzer:
         ax.set_ylabel("Суммарная разница шайб")
         ax.grid(True, linestyle="--", alpha=0.5)
         fig.autofmt_xdate()
+        # Функция tight_layout регулирует внутренние отступы
+        # Это нужно чтобы графики не накладывались друг на друга
         plt.tight_layout()
+        # Функция show() отображает график
         plt.show()
 
     def plot_goals_histogram(self) -> None:
