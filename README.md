@@ -20,6 +20,10 @@ python main.py <path_to_csv>
 - `--team` - команда, для которой необходимо выполнить задание
 - `--format` - формат вывода (text, pretty, html)
 - `--output` - вывод в файл (по умолчанию в консоль)
+- `--standings-mode` - режим вывода таблиц для задачи "standings":
+  - both - выводить общую таблицу и таблицы конференций вместе (по умолчанию)
+  - championship - выводить только итоговую таблицу чемпионата
+  - conferences - выводить только таблицы конференций
 
 ### Задание 1. График набора очков конкретной командой по датам
 
@@ -93,10 +97,22 @@ python main.py <path_to_csv>
 
 Для демонстрации работы общей таблицы чемпионата и конференций со встроенной рамкой `tabulate`:
 
-- **Запуск для сезона 2017/18:**
+- **Вывод чемпионата и конференций вместе (Режим "чемпионат+конференции"):**
 
     ```bash
-    python main.py data/khl_2017_18.csv --task standings --pretty
+    python main.py data/khl_2017_18.csv --task standings --standings-mode both --format pretty
+    ```
+
+- **Вывод только общей таблицы (Режим "чемпионат"):**
+
+    ```bash
+    python main.py data/khl_2017_18.csv --task standings --standings-mode championship --format pretty
+    ```
+
+- **Вывод только конференций (Режим "конференции"):**
+
+    ```bash
+    python main.py data/khl_2017_18.csv --task standings --standings-mode conferences --format pretty
     ```
 
 ## Небольшой гайдик по стеку задания
