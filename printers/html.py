@@ -3,6 +3,7 @@
 import sys
 from .base import BasePrinter
 from models import StandingsTable
+from typing import Callable
 
 class HtmlPrinter(BasePrinter):
     """
@@ -11,9 +12,9 @@ class HtmlPrinter(BasePrinter):
     Использует встроенные векторные возможности Pandas для рендеринга HTML,
     что исключает ручную конкатенацию строк и использование циклов.
     """
-    def print_table(self, table: StandingsTable, title: str, stream=sys.stdout) -> None:
+    def print_table(self, table: StandingsTable, title: str, stream=sys.stdout, formatter: Callable[[], str] = lambda text: text) -> None:
         # Выводим заголовок в теге h2 и генерируем таблицу
-        stream.write(f"\n<h2>{title}</h2>\n")
+        stream.write(f"\n<h2>{formatter(title)}</h2>\n")
         
         # Метод .to_html() преобразует DataFrame в готовую HTML-таблицу.
         # border=1 добавляет стандартную рамку, а index=False убирает колонку индексов Pandas.
