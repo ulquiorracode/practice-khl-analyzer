@@ -52,9 +52,10 @@ def main() -> None:
     # Валидация аргументов
     is_team_required: bool = pd.Series([args.task]).isin(["points_plot", "diff_plot"]).iloc[0]
     is_team_empty: bool = pd.Series([args.team]).isin(["", None]).iloc[0]
+
     (is_team_required and is_team_empty) and sys.exit("Ошибка: Параметр --team обязателен для этого режима.")
 
-    # Выбираем поток вывода без использования условного оператора "if"
+    # Выбираем поток вывода
     # Использование лямбда-функций позволяет отложить открытие файла до момента вызова
     stream_resolver: Dict[bool, Callable[[], any]] = {
         True: lambda: open(args.output, "w", encoding="utf-8"),
@@ -64,6 +65,8 @@ def main() -> None:
     output_stream = stream_resolver[bool(args.output)]()
 
     def run_standings() -> None:
+        """Запуск построения турнирной таблицы"""
+
         # Передаем поток вывода в принтеры
         printer.print_table(analyzer.get_champion_table(), "Итоговая таблица чемпионата", output_stream)
         conf_tables = analyzer.get_conference_tables()
@@ -72,7 +75,7 @@ def main() -> None:
         )
         
         # Закрываем поток, если это файл (sys.stdout закрывать нельзя)
-        # Проверяем, является ли поток файлом, без использования if
+        # Проверяем, является ли поток файлом
         is_file: bool = output_stream != sys.stdout
         is_file and output_stream.close()
 
@@ -88,5 +91,6 @@ def main() -> None:
     dispatch_map[args.task]()
 
 
+# Точка входа, если запускаем этот файл
 if __name__ == "__main__":
     main()

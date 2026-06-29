@@ -7,6 +7,16 @@ import pandas as pd
 from config import CONFERENCES, DIVISIONS
 from models import MatchSchema, StandingsTable
 
+# И   - Количество проведенных матчей
+# В   - Выигрыши в основное время (начисляется 3 очка)
+# ВО  - Выигрыши в овертайме (начисляется 2 очка)
+# ВБ  - Выигрыши в серии послематчевых буллитов (начисляется 2 очка)
+# ПБ  - Поражения в серии послематчевых буллитов (начисляется 1 очко)
+# ПО  - Поражения в овертайме (начисляется 1 очко)
+# П   - Поражения в основное время (очки не начисляются, 0 очков)
+# Ш   - Разница заброшенных и пропущенных шайб (в формате "Забито-Пропущено")
+# О   - Общее количество набранных очков
+
 # Словарь для начисления очков в КХЛ (система: 3 очка за победу в основное время)
 # В - победа (3 очка), ВО/ВБ - победа в овертайме/буллитах (2 очка)
 # ПО/ПБ - поражение в овертайме/буллитах (1 очко), П - поражение (0 очков)
@@ -37,6 +47,7 @@ class KHLSeasonAnalyzer:
         # Строим общую турнирную таблицу чемпионата
         self.global_standings_raw: pd.DataFrame = self._build_global_standings()
 
+
     def _parse_score(self, score_series: pd.Series) -> Tuple[pd.Series, pd.Series]:
         """
         Парсит строковый счет матча или периода (например, "3:2") в два числовых столбца.
@@ -44,14 +55,18 @@ class KHLSeasonAnalyzer:
         # Заменяем пустые значения (NaN) на двоеточие ":" и приводим к строке
         filled: pd.Series = score_series.fillna(":").astype(str).str.strip()
         # Если счет отсутствует (просто ":"), заменяем его на "0:0"
+        # mask для условной замены на основе предиката
         cleaned: pd.Series = filled.mask(filled.eq(":"), "0:0")
         # Разделяем строку по символу ":" на две колонки (голы хозяев и гостей)
         split_scores: pd.DataFrame = cleaned.str.split(":", expand=True)
         
         # Преобразуем строки в целые числа. Ошибки парсинга заменяем на 0
+        # принудительно подавляем исключение ValueError, заменяя некорректные значения на NaN
         home_goals: pd.Series = pd.to_numeric(split_scores[0], errors="coerce").fillna(0).astype(int)
         away_goals: pd.Series = pd.to_numeric(split_scores[1], errors="coerce").fillna(0).astype(int)
+        
         return home_goals, away_goals
+
 
     def _process_match_outcomes(self) -> pd.DataFrame:
         """
@@ -89,6 +104,10 @@ class KHLSeasonAnalyzer:
 
         # Определяем буквенный код исхода для хозяев поля (по умолчанию "П" - поражение)
         # И последовательно заменяем (маскируем) значение в зависимости от условий
+        # Порядок маскирования важен: проверка на победу в овертайме (ВО) должна идти раньше, чем на победу в буллитах (ВБ),
+        # так как условие for so_home_win (ПБ) = ot_tie & so_h.lt(so_a) проверяет победу в буллитах (соответственно, so_away_win - поражение)
+        # то есть сначала проверяем победу в овертайме (ВО), потом в буллитах (ВБ)
+        # и если мы проиграли в буллитах (ПБ), то мы уже не можем выиграть в овертайме (ВО), поэтому ПБ идет раньше
         home_code: pd.Series = pd.Series("П", index=self.matches_df.index)
         home_code = home_code.mask(reg_home_win, "В").mask(ot_home_win, "ВО").mask(so_home_win, "ВБ")
         home_code = home_code.mask(so_away_win, "ПБ").mask(ot_away_win, "ПО")
@@ -108,16 +127,25 @@ class KHLSeasonAnalyzer:
 
         # Создаем плоские датафреймы для хозяев и для гостей
         home_df: pd.DataFrame = pd.DataFrame({
-            "Дата": self.matches_df[MatchSchema.DATE], "Команда": self.matches_df[MatchSchema.TEAM_1],
-            "Забито": h_goals, "Пропущено": a_goals, "Очки_матч": home_pts, "Исход": home_code
+            "Дата": self.matches_df[MatchSchema.DATE],
+            "Команда": self.matches_df[MatchSchema.TEAM_1],
+            "Забито": h_goals,
+            "Пропущено": a_goals,
+            "Очки_матч": home_pts,
+            "Исход": home_code
         })
         away_df: pd.DataFrame = pd.DataFrame({
-            "Дата": self.matches_df[MatchSchema.DATE], "Команда": self.matches_df[MatchSchema.TEAM_2],
-            "Забито": a_goals, "Пропущено": h_goals, "Очки_матч": away_pts, "Исход": away_code
+            "Дата": self.matches_df[MatchSchema.DATE],
+            "Команда": self.matches_df[MatchSchema.TEAM_2],
+            "Забито": a_goals,
+            "Пропущено": h_goals,
+            "Очки_матч": away_pts,
+            "Исход": away_code
         })
-        
+
         # Объединяем их по вертикали (строка под строкой) в один большой реестр сыгранных матчей
         return pd.concat([home_df, away_df], ignore_index=True)
+
 
     def _build_global_standings(self) -> pd.DataFrame:
         """
@@ -126,12 +154,22 @@ class KHLSeasonAnalyzer:
         # С помощью сводной таблицы (pivot_table) подсчитываем количество каждого исхода ("В", "ВО" и т.д.) для команд.
         # index="Команда" группирует по клубам, columns="Исход" создает столбцы для каждого типа исхода.
         outcomes_pivot: pd.DataFrame = self.team_games_df.pivot_table(
-            index="Команда", columns="Исход", values="Очки_матч", aggfunc="count", fill_value=0
+            index="Команда",
+            columns="Исход",
+            values="Очки_матч",
+            aggfunc="count",
+            fill_value=0
         ).reindex(columns=["В", "ВО", "ВБ", "ПБ", "ПО", "П"], fill_value=0).astype(int)
 
         # Группируем игры по командам и суммируем забитые/пропущенные шайбы, а также набранные очки
+        # используем синтаксис именованной агрегации
+        # Имя_Новой_Колонки=("Исходная_Колонка","Функция_Агрегации")
+        # иначе бы пришлось сначала аггрегировать по существующим колонкам, 
+        # а потом переименовывать их через .rename(columns={"Очки_матч": "О"})
         aggregations: pd.DataFrame = self.team_games_df.groupby("Команда").agg(
-            Забито=("Забито", "sum"), Пропущено=("Пропущено", "sum"), О=("Очки_матч", "sum")
+            Забито=("Забито", "sum"),
+            Пропущено=("Пропущено", "sum"),
+            О=("Очки_матч", "sum")
         )
 
         # Объединяем сводную таблицу исходов и таблицу суммарных показателей по индексу (названию клуба)
@@ -152,11 +190,14 @@ class KHLSeasonAnalyzer:
         standings["Sub_Место"] = np.arange(1, len(standings) + 1) # Временное поле
         standings["Место"] = standings["Sub_Место"]
         standings = standings.drop(columns=["Sub_Место"])
+        
         return standings
+
 
     def get_champion_table(self) -> StandingsTable:
         """Возвращает общую таблицу регулярного чемпионата."""
         return StandingsTable(self.global_standings_raw)
+
 
     def get_conference_tables(self) -> Dict[str, StandingsTable]:
         """
@@ -168,9 +209,10 @@ class KHLSeasonAnalyzer:
         div_dict: Dict[str, List[List[str]]] = DIVISIONS.get(self.season_key, {})
 
         # Строим соответствие "Клуб -> Конференция" с помощью Pandas
-        conf_mapping: pd.Series = pd.DataFrame(
-            {"Конференция": list(conf_dict.keys()), "Клуб": list(conf_dict.values())}
-        ).explode("Клуб").set_index("Клуб")["Конференция"]
+        conf_mapping: pd.Series = pd.DataFrame({
+            "Конференция": list(conf_dict.keys()),
+            "Клуб": list(conf_dict.values())
+        }).explode("Клуб").set_index("Клуб")["Конференция"]
         
         mapped_standings: pd.DataFrame = self.global_standings_raw.copy()
         # Прикрепляем к каждой команде её конференцию
@@ -181,8 +223,19 @@ class KHLSeasonAnalyzer:
         div_list_east: List[List[str]] = div_dict.get("Восток", [])
 
         # Разносим клубы по числовым номерам дивизионов (0, 1 для Запада; 2, 3 для Востока)
-        div_mapping_west: pd.Series = pd.DataFrame({"Дивизион": [0, 1], "Клуб": div_list_west}).explode("Клуб").set_index("Клуб")["Дивизион"] if div_list_west else pd.Series(dtype=int)
-        div_mapping_east: pd.Series = pd.DataFrame({"Дивизион": [2, 3], "Клуб": div_list_east}).explode("Клуб").set_index("Клуб")["Дивизион"] if div_list_east else pd.Series(dtype=int)
+        # Использование списков идентификаторов [0, 1] для Западной конференции
+        # и [2, 3] для Восточной конференции обусловлено необходимостью присвоить
+        # каждому из четырех дивизионов уникальный числовой идентификатор в рамках всей лиги.
+
+        div_mapping_west: pd.Series = pd.DataFrame({
+            "Дивизион": [0, 1],
+            "Клуб": div_list_west
+        }).explode("Клуб").set_index("Клуб")["Дивизион"] if div_list_west else pd.Series(dtype=int)
+        
+        div_mapping_east: pd.Series = pd.DataFrame({
+            "Дивизион": [2, 3],
+            "Клуб": div_list_east
+        }).explode("Клуб").set_index("Клуб")["Дивизион"] if div_list_east else pd.Series(dtype=int)
         
         div_mapping: pd.Series = pd.concat([div_mapping_west, div_mapping_east])
         # Записываем дивизион в общую таблицу, отсутствующим ставим -1
@@ -208,6 +261,8 @@ class KHLSeasonAnalyzer:
         # Возвращаем словарь с готовыми таблицами для каждой конференции
         return {name: process_sub_conf(name) for name in conf_dict.keys()}
 
+
+    # Индивидуальное задание №1
     def plot_team_points(self, team_name: str) -> None:
         """Строит линейный график набора очков конкретной команды во времени."""
         # Фильтруем матчи только для нужной команды и сортируем по дате
@@ -228,6 +283,8 @@ class KHLSeasonAnalyzer:
         plt.tight_layout()
         plt.show()
 
+
+    # Индивидуальное задание №2
     def plot_points_histogram(self) -> None:
         """Строит гистограмму распределения итоговых очков среди всех команд."""
         fig, ax = plt.subplots(figsize=(10, 5))
@@ -241,9 +298,17 @@ class KHLSeasonAnalyzer:
         plt.tight_layout()
         plt.show()
 
+
+    # Индивидуальное задание №3
     def plot_team_goal_diff(self, team_name: str) -> None:
         """Строит кумулятивный график разницы забитых/пропущенных шайб команды."""
         # Выбираем матчи конкретной команды
+        # copy нужен, чтобы избежать ошибки "chained assignment" при добавлении новых столбцов или предупреждения
+        # SettingWithCopyWarning: A value is trying to be set on a copy of a slice from a DataFrame.
+        # Явный вызов .copy() в самом конце цепочки:
+        #   Полностью разрывает связь с исходным DataFrame self.team_games_df.
+        #   Гарантирует, что в памяти создан абсолютно независимый объект.
+        #   Полностью исключает появление предупреждения SettingWithCopyWarning при последующем добавлении новых колонок.
         team_data: pd.DataFrame = self.team_games_df[self.team_games_df["Команда"] == team_name].sort_values("Дата").copy()
         # Считаем разницу шайб в отдельно взятом матче
         team_data["Разница_матча"] = team_data["Забито"] - team_data["Пропущено"]
@@ -267,6 +332,8 @@ class KHLSeasonAnalyzer:
         # Функция show() отображает график
         plt.show()
 
+    
+    # Индивидуальное задание №4
     def plot_goals_histogram(self) -> None:
         """Строит гистограмму забитых шайб командами в лиге."""
         fig, ax = plt.subplots(figsize=(10, 5))
