@@ -227,6 +227,7 @@ class KHLSeasonAnalyzer:
         # и [2, 3] для Восточной конференции обусловлено необходимостью присвоить
         # каждому из четырех дивизионов уникальный числовой идентификатор в рамках всей лиги.
 
+        # TODO: избавиться от тернарного оператора в пользу пандаса
         div_mapping_west: pd.Series = pd.DataFrame({
             "Дивизион": [0, 1],
             "Клуб": div_list_west
@@ -237,13 +238,18 @@ class KHLSeasonAnalyzer:
             "Клуб": div_list_east
         }).explode("Клуб").set_index("Клуб")["Дивизион"] if div_list_east else pd.Series(dtype=int)
         
+        # Объединяем серии
         div_mapping: pd.Series = pd.concat([div_mapping_west, div_mapping_east])
         # Записываем дивизион в общую таблицу, отсутствующим ставим -1
+        # .map() заменяет все значения в серии по функции или серии мапперу
+        # ищет соответсвие для старого значения и заменяет новым 
         mapped_standings["Дивизион"] = mapped_standings["Клуб"].map(div_mapping).fillna(-1)
 
         # Находим лидеров дивизионов (группируем по дивизиону и берем строку с максимальными очками "О")
+        # .indxmax() - ищем индекс первого элемента с максимальным значением
         division_leaders_idx: pd.Series = mapped_standings.groupby("Дивизион")["О"].idxmax()
         # Игнорируем тех, у кого дивизион не определен (-1)
+        # через .drop() удаляем все строки с лейюелами равными -1
         valid_leaders_idx: pd.Series = division_leaders_idx.drop(labels=[-1], errors="ignore")
         # Помечаем лидеров флагом 1, остальных — 0
         mapped_standings["Лидер_Дивизиона"] = mapped_standings.index.isin(valid_leaders_idx).astype(int)
@@ -259,6 +265,7 @@ class KHLSeasonAnalyzer:
             return StandingsTable(sub_df)
 
         # Возвращаем словарь с готовыми таблицами для каждой конференции
+        # TODO: избавиться от дist comprehensions в пользу пандаса
         return {name: process_sub_conf(name) for name in conf_dict.keys()}
 
 
