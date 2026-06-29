@@ -47,6 +47,7 @@ def main() -> None:
         "pretty": PrettyConsolePrinter(),
         "html": HtmlPrinter()
     }
+
     printer: BasePrinter = printer_map[args.format]
 
     # Валидация аргументов
