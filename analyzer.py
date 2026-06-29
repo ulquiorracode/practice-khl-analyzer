@@ -199,7 +199,7 @@ class KHLSeasonAnalyzer:
         return StandingsTable(self.global_standings_raw)
 
 
-    def get_conference_tables(self) -> Dict[str, StandingsTable]:
+    def get_conference_tables(self) -> pd.Series:
         """
         Формирует таблицы конференций с учетом лидерства в дивизионах.
         По регламенту КХЛ лидеры дивизионов автоматически занимают первые 2 места в конференции.
@@ -227,22 +227,16 @@ class KHLSeasonAnalyzer:
         # и [2, 3] для Восточной конференции обусловлено необходимостью присвоить
         # каждому из четырех дивизионов уникальный числовой идентификатор в рамках всей лиги.
 
-        # TODO: избавиться от тернарного оператора в пользу пандаса
-        div_mapping_west: pd.Series = pd.DataFrame({
-            "Дивизион": [0, 1],
-            "Клуб": div_list_west
-        }).explode("Клуб").set_index("Клуб")["Дивизион"] if div_list_west else pd.Series(dtype=int)
+        # Строим соответствие "Клуб -> Дивизион" чисто средствами Pandas
+        df_melted: pd.DataFrame = pd.DataFrame(div_dict).melt(value_name="Клуб", ignore_index=False)
         
-        div_mapping_east: pd.Series = pd.DataFrame({
-            "Дивизион": [2, 3],
-            "Клуб": div_list_east
-        }).explode("Клуб").set_index("Клуб")["Дивизион"] if div_list_east else pd.Series(dtype=int)
+        # Вычисляем ID дивизиона: для Запада это индекс (0 или 1), для Востока — индекс + 2
+        df_melted["Дивизион"] = df_melted["variable"].map({"Запад": 0, "Восток": 2}) + df_melted.index
         
-        # Объединяем серии
-        div_mapping: pd.Series = pd.concat([div_mapping_west, div_mapping_east])
+        # Разворачиваем списки клубов в отдельные строки и формируем Series-маппинг
+        div_mapping: pd.Series = df_melted.explode("Клуб").set_index("Клуб")["Дивизион"]
+
         # Записываем дивизион в общую таблицу, отсутствующим ставим -1
-        # .map() заменяет все значения в серии по функции или серии мапперу
-        # ищет соответсвие для старого значения и заменяет новым 
         mapped_standings["Дивизион"] = mapped_standings["Клуб"].map(div_mapping).fillna(-1)
 
         # Находим лидеров дивизионов (группируем по дивизиону и берем строку с максимальными очками "О")
@@ -265,8 +259,7 @@ class KHLSeasonAnalyzer:
             return StandingsTable(sub_df)
 
         # Возвращаем словарь с готовыми таблицами для каждой конференции
-        # TODO: избавиться от дist comprehensions в пользу пандаса
-        return {name: process_sub_conf(name) for name in conf_dict.keys()}
+        return pd.Series(list(conf_dict.keys()), index=conf_dict.keys()).apply(process_sub_conf)
 
 
     # Индивидуальное задание №1

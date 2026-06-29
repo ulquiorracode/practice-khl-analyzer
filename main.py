@@ -69,8 +69,7 @@ def main() -> None:
 
         # Передаем поток вывода в принтеры
         printer.print_table(analyzer.get_champion_table(), "Итоговая таблица чемпионата", output_stream)
-        conf_tables = analyzer.get_conference_tables()
-        pd.Series(conf_tables).apply(
+        analyzer.get_conference_tables().apply(
             lambda table: printer.print_table(table, "Таблица конференции", output_stream)
         )
         
