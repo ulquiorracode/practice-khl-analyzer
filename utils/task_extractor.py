@@ -6,7 +6,7 @@ def crop_and_shift_pdf(
     output_path: str,
     start_marker: str = "№ 9",
     end_marker: str = "№ 10",
-):
+) -> None:
     """Вырезает текст между маркерами и сдвигает его на самый верх страницы."""
     doc = fitz.open(input_path)
     out_doc = fitz.open()  # Создаем новый пустой документ

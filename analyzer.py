@@ -210,8 +210,8 @@ class KHLSeasonAnalyzer:
 
         # Строим соответствие "Клуб -> Конференция" с помощью Pandas
         conf_mapping: pd.Series = pd.DataFrame({
-            "Конференция": list(conf_dict.keys()),
-            "Клуб": list(conf_dict.values())
+            "Конференция": [*conf_dict.keys()],
+            "Клуб": [*conf_dict.values()]
         }).explode("Клуб").set_index("Клуб")["Конференция"]
         
         mapped_standings: pd.DataFrame = self.global_standings_raw.copy()
@@ -259,7 +259,7 @@ class KHLSeasonAnalyzer:
             return StandingsTable(sub_df)
 
         # Возвращаем словарь с готовыми таблицами для каждой конференции
-        return pd.Series(list(conf_dict.keys()), index=conf_dict.keys()).apply(process_sub_conf)
+        return pd.Series([*conf_dict.keys()], index=conf_dict.keys()).apply(process_sub_conf)
 
 
     # Индивидуальное задание №1

@@ -66,9 +66,6 @@ CONFERENCES: Dict[str, Conference] = {
     }
 }
 
-# Исторические составы дивизионов
-# TODO: добавить дивизионы
-# Исторические составы дивизионов
 DIVISIONS: Dict[str, Division] = {
     "khl_2013_14.csv": {
         "Запад": [
