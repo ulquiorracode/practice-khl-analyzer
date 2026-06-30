@@ -41,7 +41,7 @@ class KHLSeasonAnalyzer:
         # Читаем CSV-файл, при этом Pandas сразу преобразует колонку с датой в формат datetime
         self.matches_df: pd.DataFrame = pd.read_csv(self.csv_path, parse_dates=[MatchSchema.DATE])
         
-        # Преобразуем матчи в плоскую таблицу: одна строка — одна игра одной команды
+        # Преобразуем матчи в плоскую таблицу: одна строка - одна игра одной команды
         self.team_games_df: pd.DataFrame = self._process_match_outcomes()
         
         # Строим общую турнирную таблицу чемпионата
@@ -57,7 +57,7 @@ class KHLSeasonAnalyzer:
         # Если счет отсутствует (просто ":"), заменяем его на "0:0"
         # mask для условной замены на основе предиката
         cleaned: pd.Series = filled.mask(filled.eq(":"), "0:0")
-        # Разделяем строку по символу ":" на две колонки (голы хозяев и гостей)
+        # Разделяем строку по символу ":" на две отдельные колонки (голы хозяев и гостей)
         split_scores: pd.DataFrame = cleaned.str.split(":", expand=True)
         
         # Преобразуем строки в целые числа. Ошибки парсинга заменяем на 0
@@ -74,76 +74,78 @@ class KHLSeasonAnalyzer:
         Превращает "матч между А и Б" в две записи: "команда А сыграла матч" и "команда Б сыграла матч".
         """
         # Извлекаем голы по периодам, овертаймам и буллитам
-        p1_h, p1_a = self._parse_score(self.matches_df[MatchSchema.PERIOD_1])
-        p2_h, p2_a = self._parse_score(self.matches_df[MatchSchema.PERIOD_2])
-        p3_h, p3_a = self._parse_score(self.matches_df[MatchSchema.PERIOD_3])
-        ot_h, ot_a = self._parse_score(self.matches_df[MatchSchema.OVERTIME])
-        so_h, so_a = self._parse_score(self.matches_df[MatchSchema.BULLETS])
+        # Распаковываем счет матчей по периодам, овертаймам и буллитам
+        period1_home,   period1_away    = self._parse_score(self.matches_df[MatchSchema.PERIOD_1])  # Голы хозяев и гостей в 1-м периоде
+        period2_home,   period2_away    = self._parse_score(self.matches_df[MatchSchema.PERIOD_2])  # Голы хозяев и гостей во 2-м периоде
+        period3_home,   period3_away    = self._parse_score(self.matches_df[MatchSchema.PERIOD_3])  # Голы хозяев и гостей в 3-м периоде
+        overtime_home,  overtime_away   = self._parse_score(self.matches_df[MatchSchema.OVERTIME])  # Голы хозяев и гостей в овертайме
+        shootouts_home, shootouts_away  = self._parse_score(self.matches_df[MatchSchema.BULLETS])   # Победные буллиты хозяев и гостей
 
         # Считаем голы в основное время (первые 3 периода)
-        reg_h: pd.Series = p1_h + p2_h + p3_h
-        reg_a: pd.Series = p1_a + p2_a + p3_a
+        reg_home: pd.Series = period1_home + period2_home + period3_home                            # Общие голы хозяев в основное время
+        reg_away: pd.Series = period1_away + period2_away + period3_away                            # Общие голы гостей в основное время
         
         # Считаем голы с учетом овертайма
-        total_h: pd.Series = reg_h + ot_h
-        total_a: pd.Series = reg_a + ot_a
+        total_home: pd.Series = reg_home + overtime_home                                            # Голы хозяев за основное время и овертайм
+        total_away: pd.Series = reg_away + overtime_away                                            # Голы гостей за основное время и овертайм
 
         # Определяем логические маски (True/False) для исходов в основное время
-        reg_home_win: pd.Series = reg_h.gt(reg_a)  # Победа хозяев в осн. время
-        reg_away_win: pd.Series = reg_h.lt(reg_a)  # Победа гостей в осн. время
-        reg_tie: pd.Series = reg_h.eq(reg_a)       # Ничья в осн. время
+        reg_home_win: pd.Series = reg_home.gt(reg_away)                                             # Маска: победа хозяев в основное время
+        reg_away_win: pd.Series = reg_home.lt(reg_away)                                             # Маска: победа гостей в основное время
+        reg_tie:      pd.Series = reg_home.eq(reg_away)                                             # Маска: ничья в основное время
 
         # Определяем исходы в овертайме
-        ot_home_win: pd.Series = reg_tie & ot_h.gt(ot_a)
-        ot_away_win: pd.Series = reg_tie & ot_h.lt(ot_a)
-        ot_tie: pd.Series = reg_tie & ot_h.eq(ot_a)
+        overtime_home_win: pd.Series = reg_tie & overtime_home.gt(overtime_away)                    # Маска: победа хозяев в овертайме
+        overtime_away_win: pd.Series = reg_tie & overtime_home.lt(overtime_away)                    # Маска: победа гостей в овертайме
+        overtime_tie:      pd.Series = reg_tie & overtime_home.eq(overtime_away)                    # Маска: ничья по итогам овертайма
 
         # Определяем исходы в серии буллитов
-        so_home_win: pd.Series = ot_tie & so_h.gt(so_a)
-        so_away_win: pd.Series = ot_tie & so_h.lt(so_a)
+        shootouts_home_win: pd.Series = overtime_tie & shootouts_home.gt(shootouts_away)            # Маска: победа хозяев в серии буллитов
+        shootouts_away_win: pd.Series = overtime_tie & shootouts_home.lt(shootouts_away)            # Маска: победа гостей в серии буллитов
 
         # Определяем буквенный код исхода для хозяев поля (по умолчанию "П" - поражение)
         # И последовательно заменяем (маскируем) значение в зависимости от условий
         # Порядок маскирования важен: проверка на победу в овертайме (ВО) должна идти раньше, чем на победу в буллитах (ВБ),
-        # так как условие for so_home_win (ПБ) = ot_tie & so_h.lt(so_a) проверяет победу в буллитах (соответственно, so_away_win - поражение)
+        # так как условие для shootouts_home_win (ПБ) = overtime_tie & shootouts_home.lt(shootouts_away ) проверяет победу в буллитах (соответственно, shootouts_away_win - поражение)
         # то есть сначала проверяем победу в овертайме (ВО), потом в буллитах (ВБ)
         # и если мы проиграли в буллитах (ПБ), то мы уже не можем выиграть в овертайме (ВО), поэтому ПБ идет раньше
         home_code: pd.Series = pd.Series("П", index=self.matches_df.index)
-        home_code = home_code.mask(reg_home_win, "В").mask(ot_home_win, "ВО").mask(so_home_win, "ВБ")
-        home_code = home_code.mask(so_away_win, "ПБ").mask(ot_away_win, "ПО")
+        home_code = home_code.mask(reg_home_win, "В").mask(overtime_home_win, "ВО").mask(shootouts_home_win, "ВБ")
+        home_code = home_code.mask(shootouts_away_win, "ПБ").mask(overtime_away_win, "ПО")
 
         # Аналогично определяем буквенный код исхода для гостей
         away_code: pd.Series = pd.Series("П", index=self.matches_df.index)
-        away_code = away_code.mask(reg_away_win, "В").mask(ot_away_win, "ВО").mask(so_away_win, "ВБ")
-        away_code = away_code.mask(so_home_win, "ПБ").mask(ot_home_win, "ПО")
+        away_code = away_code.mask(reg_away_win, "В").mask(overtime_away_win, "ВО").mask(shootouts_away_win, "ВБ")
+        away_code = away_code.mask(shootouts_home_win, "ПБ").mask(overtime_home_win, "ПО")
 
         # Переводим буквенные коды в очки с помощью словаря POINTS_MAP
         home_pts: pd.Series = home_code.map(POINTS_MAP).astype(int)
         away_pts: pd.Series = away_code.map(POINTS_MAP).astype(int)
 
         # Полное количество шайб (в КХЛ победный буллит идет в общий зачет как +1 гол)
-        h_goals: pd.Series = total_h + so_home_win.astype(int)
-        a_goals: pd.Series = total_a + so_away_win.astype(int)
+        home_goals: pd.Series = total_home + shootouts_home_win.astype(int)
+        away_goals: pd.Series = total_away + shootouts_away_win.astype(int)
 
         # Создаем плоские датафреймы для хозяев и для гостей
         home_df: pd.DataFrame = pd.DataFrame({
-            "Дата": self.matches_df[MatchSchema.DATE],
-            "Команда": self.matches_df[MatchSchema.TEAM_1],
-            "Забито": h_goals,
-            "Пропущено": a_goals,
-            "Очки_матч": home_pts,
-            "Исход": home_code
+            "Дата":         self.matches_df[MatchSchema.DATE],
+            "Команда":      self.matches_df[MatchSchema.TEAM_1],
+            "Забито":       home_goals,
+            "Пропущено":    away_goals,
+            "Очки_матч":    home_pts,
+            "Исход":        home_code
         })
         away_df: pd.DataFrame = pd.DataFrame({
-            "Дата": self.matches_df[MatchSchema.DATE],
-            "Команда": self.matches_df[MatchSchema.TEAM_2],
-            "Забито": a_goals,
-            "Пропущено": h_goals,
-            "Очки_матч": away_pts,
-            "Исход": away_code
+            "Дата":         self.matches_df[MatchSchema.DATE],
+            "Команда":      self.matches_df[MatchSchema.TEAM_2],
+            "Забито":       away_goals,
+            "Пропущено":    home_goals,
+            "Очки_матч":    away_pts,
+            "Исход":        away_code
         })
 
         # Объединяем их по вертикали (строка под строкой) в один большой реестр сыгранных матчей
+        # Забываем старые индексы и создаем новую непрерывную нумерацию
         return pd.concat([home_df, away_df], ignore_index=True)
 
 
@@ -173,12 +175,14 @@ class KHLSeasonAnalyzer:
         )
 
         # Объединяем сводную таблицу исходов и таблицу суммарных показателей по индексу (названию клуба)
+        # concat чаще всего используется для склеивания таблиц по вертикали (строка под строкой) или по горизонтали (столбец к столбцу).
+        # join используется для слияния (объединения) таблиц по их индексам (или ключевым колонкам), когда нужно сопоставить строки по смыслу.
         standings: pd.DataFrame = outcomes_pivot.join(aggregations)
         
         # Считаем количество проведенных игр ("И") как сумму всех возможных исходов
-        standings["И"] = standings[["В", "ВО", "ВБ", "ПБ", "ПО", "П"]].sum(axis=1)
+        standings["И"]          = standings[["В", "ВО", "ВБ", "ПБ", "ПО", "П"]].sum(axis=1)
         # Считаем разницу шайб
-        standings["Разница"] = standings["Забито"] - standings["Пропущено"]
+        standings["Разница"]    = standings["Забито"] - standings["Пропущено"]
         # Формируем строковое представление забитых и пропущенных шайб (например, "150-120")
         standings["Ш"] = standings["Забито"].astype(str) + "-" + standings["Пропущено"].astype(str)
         
@@ -189,6 +193,8 @@ class KHLSeasonAnalyzer:
         # Проставляем места командам от 1 до N
         standings["Sub_Место"] = np.arange(1, len(standings) + 1) # Временное поле
         standings["Место"] = standings["Sub_Место"]
+
+        # Метод df.drop() в Pandas используется для удаления строк или столбцов из DataFrame.
         standings = standings.drop(columns=["Sub_Место"])
         
         return standings
@@ -228,6 +234,8 @@ class KHLSeasonAnalyzer:
         # каждому из четырех дивизионов уникальный числовой идентификатор в рамках всей лиги.
 
         # Строим соответствие "Клуб -> Дивизион" чисто средствами Pandas
+        # Поворачивает таблицу так, что названия столбцов становятся значениями в одной новой колонке ("Клуб"),
+        # а данные внутри столбцов переносятся в другую колонку (value).
         df_melted: pd.DataFrame = pd.DataFrame(div_dict).melt(value_name="Клуб", ignore_index=False)
         
         # Вычисляем ID дивизиона: для Запада это индекс (0 или 1), для Востока — индекс + 2
@@ -309,22 +317,43 @@ class KHLSeasonAnalyzer:
         #   Полностью разрывает связь с исходным DataFrame self.team_games_df.
         #   Гарантирует, что в памяти создан абсолютно независимый объект.
         #   Полностью исключает появление предупреждения SettingWithCopyWarning при последующем добавлении новых колонок.
+
+        # Пользуемся булевой индексацией (Boolean Indexing) или фильтрацией по маске
+        # Pandas берет столбец "Команда" и сравнивает ячейку в каждой строке со значением переменной team_name.
+        # В результате получается одномерный массив (Series), состоящий исключительно из булевых значений True и False
         team_data: pd.DataFrame = self.team_games_df[self.team_games_df["Команда"] == team_name].sort_values("Дата").copy()
         # Считаем разницу шайб в отдельно взятом матче
         team_data["Разница_матча"] = team_data["Забито"] - team_data["Пропущено"]
         # Считаем разницу нарастающим итогом
         team_data["Разница_кум"] = team_data["Разница_матча"].cumsum()
 
+        # Функция plt.subplots() создает сетку из нескольких графиков внутри одной фигуры.
+        # Она возвращает сразу два объекта:
+        # саму фигуру (fig) и массив осей (ax или axes),
+        # через которые идет управление каждым отдельным графиком.
         fig, ax = plt.subplots(figsize=(10, 5))
         # Строим линию разницы шайб (с квадратными маркерами)
         ax.plot(team_data["Дата"], team_data["Разница_кум"], marker="s", color="crimson", linewidth=2)
-        # Проводим горизонтальную черту на уровне нуля (баланс забитых/пропущенных)
+        # Команда ax.axhline(0, color="black", linestyle="-.", linewidth=1) рисует постоянную горизонтальную линию через весь график на уровне y = 0.
+        # Буквы ax в начале названия означают Axis (ось), а hline — Horizontal Line.
+        # Разбор параметров:0 — координата по оси Y, где пройдет линия.color="black" — черный цвет линии (можно сократить до color="k").
+        # linestyle="-." — штрих-пунктирный стиль линии.linewidth=1 — толщина линии (можно сократить до lw=1).
         ax.axhline(0, color="black", linestyle="-.", linewidth=1)
         
         ax.set_title(f"Разница забитых и пропущенных шайб команды «{team_name}»", fontsize=12)
         ax.set_xlabel("Дата")
         ax.set_ylabel("Суммарная разница шайб")
+
+        # Строка кода ax.grid(True, linestyle="--", alpha=0.5)
+        # включает координатную сетку на графике и делает её визуально аккуратной.
+        # True — активирует отображение сетки (можно опустить, если передаются другие параметры: ax.grid(linestyle="--") тоже включит сетку).
+        # linestyle="--" — делает линии сетки пунктирными (штриховыми).
+        # Также можно использовать ":" (точечная) или "-." (штрих-пунктирная).
+        # alpha=0.5 — задает прозрачность линий в диапазоне от 0 (полностью прозрачная) до 1 (полностью непрозрачная).
+        # Значение 0.5 делает сетку полупрозрачной, чтобы она не отвлекала внимание от самих данных.
         ax.grid(True, linestyle="--", alpha=0.5)
+        # Метод fig.autofmt_xdate() автоматически форматирует и
+        # поворачивает даты на оси X, чтобы они не перекрывали друг друга.
         fig.autofmt_xdate()
         # Функция tight_layout регулирует внутренние отступы
         # Это нужно чтобы графики не накладывались друг на друга

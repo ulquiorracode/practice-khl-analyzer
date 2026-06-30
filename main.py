@@ -1,6 +1,11 @@
 """Точка входа приложения. Парсинг CLI и запуск задач."""
 
 import argparse
+import argparse
+import argparse
+import argparse
+import argparse
+import argparse
 import sys
 from typing import Dict, Callable
 import pandas as pd
@@ -33,7 +38,12 @@ def main() -> None:
         default="both",
         help="Режим вывода таблиц: both (чемпионат+конференции), championship (только общая), conferences (только конференции)"
     )
-    parser.add_argument("--team", type=str, default="", help="Целевая команда")
+    parser.add_argument(
+        "--team",
+        type=str,
+        default="",
+        help="Целевая команда"
+    )
     parser.add_argument(
         "--format",
         type=str,
@@ -48,6 +58,7 @@ def main() -> None:
         default="",
         help="Путь к файлу для сохранения вывода (позволяет избежать проблем с кодировкой консоли)"
     )
+    
     args = parser.parse_args()
 
     analyzer = KHLSeasonAnalyzer(args.csv_file)
@@ -61,8 +72,12 @@ def main() -> None:
     printer: BasePrinter = printer_map[args.format]
 
     # Валидация аргументов
-    is_team_required: bool = pd.Series([args.task]).isin(["points_plot", "diff_plot"]).iloc[0]
-    is_team_empty: bool = pd.Series([args.team]).isin(["", None]).iloc[0]
+    # Проверяем, требует ли выбранная задача указания конкретной команды (возвращает True/False)
+    # Переданная из консоли задача оборачивается в векторную серию pd.Series([args.task]).
+    # Метод .isin() проверяет, входит ли эта задача в список тех, где график строится для одного конкретного клуба.
+    # .iloc[0] извлекает готовое логическое значение (True или False) из полученной серии, чтобы использовать его для последующей валидации.
+    is_team_required:   bool = pd.Series([args.task]).isin(["points_plot", "diff_plot"]).iloc[0]
+    is_team_empty:      bool = pd.Series([args.team]).isin(["", None]).iloc[0]
 
     (is_team_required and is_team_empty) and sys.exit("Ошибка: Параметр --team обязателен для этого режима.")
 
